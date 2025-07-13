@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kyos Stash JSON Maker</title>
+  <style>
+    /* latin-ext */
+    @font-face {
+      font-family: 'Kode Mono';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(https://fonts.gstatic.com/s/kodemono/v3/A2BLn5pb0QgtVEPFnlYkkaoBgw4qv9odq5myxDOZadW2.woff2) format('woff2');
+      unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+    }
+    /* latin */
+    @font-face {
+      font-family: 'Kode Mono';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url(https://fonts.gstatic.com/s/kodemono/v3/A2BLn5pb0QgtVEPFnlYkkaoBgw4qv9odq5myxD2ZaQ.woff2) format('woff2');
+      unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+    }
+
+    /* Base layout */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: #000E00; /* Updated from #002b00 */
+      font-family: 'Kode Mono', monospace;
+      color: #39ff14;
+    }
+
+    /* App container */
+    #app {
+      max-width: 1000px;
+      margin: auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    h1 {
+      font-size: 3em;
+      font-weight: normal;
+      color: #39ff14;
+      text-align: center;
+      padding: 0.5rem;
+      margin-bottom: 2rem;
+      background: #003300;
+      border: 1px solid #39ff14;
+    }
+
+    /* Style toggle */
+    #style-toggle {
+      text-align: right;
+      margin-bottom: 1rem;
+    }
+    #styleSelect {
+      font-family: 'Kode Mono', monospace;
+      background: #003000;
+      color: #39ff14;
+      font-size: 16px;
+      padding: 6px 10px;
+      border: 1px solid #39ff14;
+    }
+
+    /* Filename input */
+    #filename {
+      display: block;
+      width: 300px;
+      margin-bottom: 1rem;
+      font-size: 18px;
+      padding: 10px;
+      border: 1px solid #39ff14;
+      background: #003000;
+      color: #39ff14; /* FIXED: green text */
+    }
+
+    /* Item block */
+    .item-block {
+      border: 1px solid #39ff14;
+      background: #003300;
+      padding: 16px;
+      margin-bottom: 2rem;
+    }
+
+    /* Labels */
+    label {
+      font-size: 20px;
+      padding: 10px;
+      margin-bottom: 0.5rem;
+      background: #003000;
+      border: 1px solid #39ff14;
+      display: block;
+    }
+
+    /* Inputs */
+    input[type="text"],
+    input[type="number"],
+    select {
+      height: 50px;
+      font-size: 20px;
+      background: #003000;
+      color: #39ff14; /* FIXED: green text */
+      border: 1px solid #39ff14;
+      width: 100%;
+    }
+    input::placeholder {
+      color: #66ff66;
+      font-style: italic;
+    }
+    input:focus {
+      outline: 2px solid #39ff14;
+    }
+
+    /* Sliders */
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 15px;
+      background: #003000;
+      border: 1px solid #39ff14;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 25px;
+      height: 25px;
+      background: #39ff14;
+      border: none;
+    }
+
+    /* Buttons */
+    button {
+      height: 50px;
+      font-size: 18px;
+      background: #003300;
+      color: #39ff14;
+      border: 1px solid #39ff14;
+      padding: 0 1rem;
+      cursor: pointer;
+      margin: 0.5rem 0.25rem;
+    }
+    button:hover {
+      background: #004000;
+    }
+
+    /* Template buttons */
+    .template-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .template-buttons button {
+      height: 40px;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 12px;
+      background: #002200;
+      border: 1px solid #39ff14;
+    }
+
+    /* Swatch preview inside template buttons */
+    .template-buttons span {
+      width: 20px;
+      height: 20px;
+      display: inline-block;
+      border: 1px solid white;
+    }
+
+    /* JSON preview */
+    #json-output {
+      background: #001f00;
+      color: #39ff14;
+      border: 1px solid #39ff14;
+      font-family: 'Courier New', monospace;
+      padding: 1rem;
+      font-size: 18px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>Stash JSON Maker</h1>
+
+    <input type="text" id="filename" placeholder="Enter filename..." />
+
+    <div id="editor"></div>
+    <button id="downloadBtn">Download JSON</button>
+    <pre id="json-output"></pre>
+
+    <datalist id="item-options">
+      <option value="item_apple">Apple</option>
+      <option value="item_anti_gravity_grenade">Anti-Gravity Grenade</option>
+      <option value="item_arrow">Arrow</option>
+      <option value="item_arrow_heart">Arrow Heart</option>
+      <option value="item_arrow_lightbulb">Arrow Lightbulb</option>
+      <option value="item_arena_pistol">Arena Pistol</option>
+      <option value="item_arena_shotgun">Arena Shotgun</option>
+      <option value="item_backpack">Backpack</option>
+      <option value="item_backpack_black">Black Backpack</option>
+      <option value="item_backpack_green">Green Backpack</option>
+      <option value="item_backpack_large_base">Large Base Backpack</option>
+      <option value="item_backpack_large_clover">Large Clover Backpack</option>
+      <option value="item_backpack_large_basketball">Large Basketball Backpack</option>
+      <option value="item_backpack_pink">Pink Backpack</option>
+      <option value="item_backpack_small_base">Small Base Backpack</option>
+      <option value="item_backpack_white">White Backpack</option>
+      <option value="item_backpack_with_flashlight">Backpack with Flashlight</option>
+      <option value="item_balloon">Balloon</option>
+      <option value="item_balloon_heart">Heart Balloon</option>
+      <option value="item_banana">Banana</option>
+      <option value="item_baseball_bat">Baseball Bat</option>
+      <option value="item_big_cup">Big Cup</option>
+      <option value="item_boombox">Boombox</option>
+      <option value="item_box_fan">Box Fan</option>
+      <option value="item_boombox_neon">Neon Boombox</option>
+      <option value="item_calculator">Calculator</option>
+      <option value="item_cardboard_box">Cardboard Box</option>
+      <option value="item_cash">Cash</option>
+      <option value="item_cash_pile">Cash Pile</option>
+      <option value="item_cash_mega_pile">Mega Cash Pile</option>
+      <option value="item_clapper">Clapper</option>
+      <option value="item_cluster_grenade">Cluster Grenade</option>
+      <option value="item_cola">Cola</option>
+      <option value="item_cola_large">Large Cola</option>
+      <option value="item_company_ration">Company Ration</option>
+      <option value="item_company_ration_heal">Company Ration (Heal)</option>
+      <option value="item_cracker">Cracker</option>
+      <option value="item_crate">Crate</option>
+      <option value="item_crossbow">Crossbow</option>
+      <option value="item_crossbow_heart">Heart Crossbow</option>
+      <option value="item_crowbar">Crowbar</option>
+      <option value="item_disc">Disc</option>
+      <option value="item_disposable_camera">Disposable Camera</option>
+      <option value="item_dynamite">Dynamite</option>
+      <option value="item_dynamite_cube">Dynamite Cube</option>
+      <option value="item_hawaiian_drum">Drums</option>
+      <option value="item_egg">Yummy Egg!</option>
+      <option value="item_flaregun">Flare Gun</option>
+      <option value="item_flashbang">Flashbang</option>
+      <option value="item_flashlight">Flashlight</option>
+      <option value="item_flashlight_mega">Mega Flashlight</option>
+      <option value="item_flashlight_red">Red Flashlight</option>
+      <option value="item_floppy3">Floppy 3</option>
+      <option value="item_floppy5">Floppy 5</option>
+      <option value="item_football">Football</option>
+      <option value="item_frying_pan">Frying Pan</option>
+      <option value="item_glowstick">Glowstick</option>
+      <option value="item_goldbar">Gold Bar</option>
+      <option value="item_grenade">Grenade</option>
+      <option value="item_heart_chunk">Heart Chunk</option>
+      <option value="item_heart_gun">Heart Gun</option>
+      <option value="item_heartchocolatebox">Heart Chocolate Box</option>
+      <option value="item_hh_key">HH Key</option>
+      <option value="item_hookshot">Hookshot</option>
+      <option value="item_hookshot_sword">Yeetblade</option>
+      <option value="item_hoverpad">Hoverpad</option>
+      <option value="item_impulse_grenade">Impulse Grenade</option>
+      <option value="item_jetpack">Jetpack</option>
+      <option value="item_keycard">Keycard</option>
+      <option value="item_lance">Lance</option>
+      <option value="item_large_banana">Large Banana</option>
+      <option value="item_mug">Mug</option>
+      <option value="item_landmine">landmine</option>
+      <option value="item_nut">Nut</option>
+      <option value="item_ogre_hands">Ogre Hands</option>
+      <option value="item_ore_copper_l">Large Copper Ore</option>
+      <option value="item_ore_copper_m">Medium Copper Ore</option>
+      <option value="item_ore_copper_s">Small Copper Ore</option>
+      <option value="item_ore_gold_l">Large Gold Ore</option>
+      <option value="item_ore_gold_m">Medium Gold Ore</option>
+      <option value="item_ore_gold_s">Small Gold Ore</option>
+      <option value="item_ore_hell">***** Ore</option>
+      <option value="item_ore_silver_l">Large Silver Ore</option>
+      <option value="item_ore_silver_m">Medium Silver Ore</option>
+      <option value="item_ore_silver_s">Small Silver Ore</option>
+      <option value="item_painting_canvas">Painting Canvas</option>
+      <option value="item_paperpack">Paper Pack</option>
+      <option value="item_pelican_case">Suit/Pelican Case</option>
+      <option value="item_pickaxe">Pickaxe</option>
+      <option value="item_pickaxe_cny">CNY Pickaxe</option>
+      <option value="item_pickaxe_cube">Cube Pickaxe</option>
+      <option value="item_pipe">Pipe</option>
+      <option value="item_pinata_bat">Pinata Bat</option>
+      <option value="item_plunger">Plunger</option>
+      <option value="item_pogostick">Pogostick</option>
+      <option value="item_police_baton">Police Baton</option>
+      <option value="item_pumpkin_pie">Pumpkin Pie</option>
+      <option value="item_pumpkinjack">Pumpkin Jack</option>
+      <option value="item_pumpkinjack_small">Small Pumpkin Jack</option>
+      <option value="item_quiver">Quiver</option>
+      <option value="item_quiver_heart">Heart Quiver</option>
+      <option value="item_radioactive_broccoli">Radioactive Broccoli</option>
+      <option value="item_broccoli_grenade">Brocoli Bomb Hugify</option>
+      <option value="item_broccoli_shrink_grenade">Brocoli Bomb Shrinkify</option>
+      <option value="item_randombox_mobloot_big">Random Box Mob Loot (Big)</option>
+      <option value="item_randombox_mobloot_medium">Random Box Mob Loot (Medium)</option>
+      <option value="item_randombox_mobloot_small">Random Box Mob Loot (Small)</option>
+      <option value="item_randombox_mobloot_weapons">Random Box Mob Loot (Weapons)</option>
+      <option value="item_revolver">Revolver</option>
+      <option value="item_revolver_ammo">Revolver Ammo</option>
+      <option value="item_rope">Rope</option>
+      <option value="item_rpg">RPG</option>
+      <option value="item_rpg_spear">Boomspear</option>
+      <option value="item_rpg_ammo">RPG Ammo</option>
+      <option value="item_rpg_ammo_spear">RPG Ammo Spear</option>
+      <option value="item_rpg_cny">CNY RPG</option>
+      <option value="item_rubberducky">Rubber Ducky</option>
+      <option value="item_ruby">Ruby</option>
+      <option value="item_saddle">Saddle</option>
+      <option value="item_scanner">Scanner</option>
+      <option value="item_scissors">Scissors</option>
+      <option value="item_shield">Shield</option>
+      <option value="item_shield_bones">Bones Shield</option>
+      <option value="item_shield_police">Police Shield</option>
+      <option value="item_shotgun">Shotgun</option>
+      <option value="item_shotgun_ammo">Shotgun Ammo</option>
+      <option value="item_shredder">Shredder</option>
+      <option value="item_shrinking_broccoli">Shrinking Broccoli</option>
+      <option value="item_snowball">Snowball</option>
+      <option value="item_stapler">Stapler</option>
+      <option value="item_stick_armbones">Stick Arm Bones</option>
+      <option value="item_stick_bone">Stick Bone</option>
+<option value="item_sticker_dispenser">Sticker Dispenser</option>
+<option value="item_sticky_dynamite">Sticky Dynamite</option>
+<option value="item_stinky_cheese">Stinky Cheese</option>
+<option value="item_tablet">Tablet</option>
+<option value="item_tapedispenser">Tape Dispenser</option>
+<option value="item_tele_grenade">Tele Grenade</option>
+<option value="item_theremin">Theremin</option>
+<option value="item_timebomb">Time Bomb</option>
+<option value="item_toilet_paper">Toilet Paper</option>
+<option value="item_toilet_paper_mega">Mega Toilet Paper</option>
+<option value="item_toilet_paper_roll_empty">Empty Toilet Paper Roll</option>
+<option value="item_treestick">Tree Stick</option>
+<option value="item_tripwire_explosive">Tripwire Explosive</option>
+<option value="item_trophy">Trophy</option>
+<option value="item_turkey_leg">Turkey Leg</option>
+<option value="item_turkey_whole">Whole Turkey</option>
+<option value="item_umbrella">Umbrella</option>
+<option value="item_umbrella_clover">Clover Umbrella</option>
+<option value="item_unidentified">Unidentified</option>
+<option value="item_ukulele">Ukulele</option>
+<option value="item_ukulele_gold">Gold Ukulelepple</option>
+<option value="item_upsidedown_loot">Upside Down Loot</option>
+<option value="item_uranium_chunk_l">Large Uranium Chunk</option>
+<option value="item_uranium_chunk_m">Medium Uranium Chunk</option>
+<option value="item_uranium_chunk_s">Small Uranium Chunk</option>
+<option value="item_whoopie">Whoopie</option>
+<option value="item_zipline_gun">Zipline Gun</option>
+<option value="item_rpg_easter">Easter RPG</option>
+<option value="item_rpg_ammo_egg">RPG Ammo Egg</option>
+<option value="item_revolver_gold">Gold Revolver</option>
+<option value="item_viking_hammer">Hammer Yellow</option>
+<option value="item_viking_hammer_twilight ">Hammer Twilight</option>
+<option value="item_zombie_meat">Zombie Flesh</option>
+<option value="item_randombox_mobloot_zombie">Zombie Loot Box</option>
+<option value="item_shield_viking_1">Viking Shield 1</option>
+<option value="item_shield_viking_2">Viking Shield 2</option>
+<option value="item_shield_viking_3">Viking Shield 3</option>
+<option value="item_shield_viking_4">Viking Shield 4</option>
+<option value="item_arrow_teleport">Arrow Teleport</option>
+<option value="item_arrow_bomb">Arrow Bomb</option>
+<option value="item_portable_teleporter">Portable Teleporter</option>
+<option value="item_drill">BFD9000/Drill</option>
+<option value="item_ceo_plaque">CEO Plaque</option>
+<option value="item_d20">D20</option>
+<option value="item_electrical_tape">Eletrical Tape</option>
+<option value="item_eraser">Eraser</option>
+<option value="item_finger_board">Finger Board</option>
+<option value="item_gameboy">Game Box</option>
+<option value="item_goldcoin">Golden Coin</option>
+<option value="item_harddrive">Encrypted Data</option>
+<option value="item_rare_card">Rare Trading Card</option>
+<option value="item_server_pad">Broken Tablet</option>
+<option value="item_teleport_gun">Teleport Gun</option>
+<option value="item_golden_grenade">Golden Grenade</option>
+       
+    </datalist>
+  </div>
+
+  <script>
+    const model = [];
+
+    const editorDiv = document.getElementById('editor');
+    const outputPre = document.getElementById('json-output');
+    const filenameInput = document.getElementById('filename');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    function renderItems(items, container) {
+      container.innerHTML = '';
+      items.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'item-row';
+
+        const controls = document.createElement('div');
+        controls.className = 'item-controls';
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'toggle-children';
+        toggleBtn.textContent = item.expanded ? '-' : '+';
+        toggleBtn.title = item.expanded ? 'Collapse children' : 'Expand children';
+        toggleBtn.onclick = () => {
+          item.expanded = !item.expanded;
+          renderEditor();
+        };
+        controls.appendChild(toggleBtn);
+
+        const itemIDInput = document.createElement('input');
+        itemIDInput.setAttribute('list', 'item-options');
+        itemIDInput.className = 'itemID';
+        itemIDInput.placeholder = 'Item ID';
+        itemIDInput.value = item.itemID;
+        itemIDInput.oninput = e => {
+          item.itemID = e.target.value;
+          updateOutput();
+        };
+        controls.appendChild(itemIDInput);
+
+        const addSlider = (labelText, min, max, step, value, onChange) => {
+          const container = document.createElement('div');
+          container.className = 'slider-container';
+
+          const label = document.createElement('label');
+          label.textContent = `${labelText}`;
+
+          const slider = document.createElement('input');
+          slider.type = 'range';
+          slider.min = min;
+          slider.max = max;
+          slider.step = step;
+          slider.value = value;
+
+          const display = document.createElement('span');
+          display.textContent = value;
+
+          slider.oninput = e => {
+            onChange(e);
+            display.textContent = e.target.value;
+            updateOutput();
+          };
+
+          container.appendChild(label);
+          container.appendChild(slider);
+          container.appendChild(display);
+
+          return container;
+        };
+
+        controls.appendChild(addSlider('Hue:', 0, 360, 1, item.colorHue, e => item.colorHue = parseInt(e.target.value)));
+        controls.appendChild(addSlider('Saturation:', 0, 100, 1, item.colorSaturation, e => item.colorSaturation = parseInt(e.target.value)));
+        controls.appendChild(addSlider('Scale Modifier:', 0, 5, 0.01, item.scaleModifier, e => item.scaleModifier = parseFloat(e.target.value)));
+
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = 'x';
+        removeBtn.title = 'Remove item';
+        removeBtn.onclick = () => {
+          items.splice(idx, 1);
+          renderEditor();
+        };
+        controls.appendChild(removeBtn);
+
+        const addChildBtn = document.createElement('button');
+        addChildBtn.textContent = '+ Child';
+        addChildBtn.title = 'Add child item';
+        addChildBtn.onclick = () => {
+          if (!item.children) item.children = [];
+          item.children.push({
+            itemID: '',
+            colorHue: 0,
+            colorSaturation: 0,
+            scaleModifier: 0,
+            children: [],
+            expanded: true
+          });
+          item.expanded = true;
+          renderEditor();
+        };
+        controls.appendChild(addChildBtn);
+
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = 'Copy';
+        copyBtn.title = 'Copy this item';
+        copyBtn.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(JSON.stringify(item));
+          } catch (e) {
+            alert('Clipboard permission denied or unsupported.');
+          }
+        };
+        controls.appendChild(copyBtn);
+
+        const pasteBtn = document.createElement('button');
+        pasteBtn.textContent = 'Paste';
+        pasteBtn.title = 'Paste over this item';
+        pasteBtn.onclick = async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            const data = JSON.parse(text);
+            Object.assign(item, data);
+            renderEditor();
+          } catch (e) {
+            alert('Clipboard read failed.');
+          }
+        };
+        controls.appendChild(pasteBtn);
+
+        row.appendChild(controls);
+
+        const childrenContainer = document.createElement('div');
+        childrenContainer.style.marginLeft = '20px';
+        if (item.children && item.expanded) {
+          renderItems(item.children, childrenContainer);
+        }
+        row.appendChild(childrenContainer);
+
+        container.appendChild(row);
+      });
+    }
+
+    function renderEditor() {
+      renderItems(model, editorDiv);
+      updateOutput();
+    }
+
+    function updateOutput() {
+      function clean(itemOrItems) {
+        if (Array.isArray(itemOrItems)) {
+          return itemOrItems.map(({ expanded, children, ...rest }) => {
+            const cleanedItem = { ...rest };
+            if (children && children.length > 0) {
+              cleanedItem.children = clean(children);
+            }
+            return cleanedItem;
+          });
+        } else if (itemOrItems && typeof itemOrItems === 'object') {
+          const { expanded, children, ...rest } = itemOrItems;
+          const cleanedItem = { ...rest };
+          if (children && children.length > 0) {
+            cleanedItem.children = clean(children);
+          }
+          return cleanedItem;
+        }
+        return itemOrItems;
+      }
+
+      if (model.length === 1) {
+        outputPre.textContent = JSON.stringify(clean(model[0]), null, 2);
+      } else {
+        outputPre.textContent = JSON.stringify(clean(model), null, 2);
+      }
+    }
+
+    function downloadJSON() {
+      const blob = new Blob([outputPre.textContent], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const filename = filenameInput.value.trim() || 'stash';
+      a.download = filename + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    const addRootBtn = document.createElement('button');
+    addRootBtn.textContent = '+ Add root item';
+    addRootBtn.style.marginTop = '10px';
+    addRootBtn.onclick = () => {
+      model.push({
+        itemID: '',
+        colorHue: 0,
+        colorSaturation: 0,
+        scaleModifier: 0,
+        children: [],
+        expanded: true
+      });
+      renderEditor();
+    };
+    document.getElementById('app').insertBefore(addRootBtn, editorDiv);
+
+    downloadBtn.addEventListener('click', downloadJSON);
+
+    renderEditor();
+  </script>
+</body>
+</html>
