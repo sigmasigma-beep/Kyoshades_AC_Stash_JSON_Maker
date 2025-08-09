@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <title>Kyos Stash JSON Maker</title>
   <style>
-    /* latin-ext */
+   
     @font-face {
       font-family: 'Kode Mono';
       font-style: normal;
@@ -13,7 +13,7 @@
       src: url(https://fonts.gstatic.com/s/kodemono/v3/A2BLn5pb0QgtVEPFnlYkkaoBgw4qv9odq5myxDOZadW2.woff2) format('woff2');
       unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
     }
-    /* latin */
+   
     @font-face {
       font-family: 'Kode Mono';
       font-style: normal;
@@ -23,24 +23,24 @@
       unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
     }
 
-    /* Base layout */
+   
     html, body {
       height: 100%;
       margin: 0;
       padding: 0;
-      background: #000E00; /* Updated from #002b00 */
+      background: #000E00; 
       font-family: 'Kode Mono', monospace;
       color: #39ff14;
     }
 
-    /* App container */
+    
     #app {
       max-width: 1000px;
       margin: auto;
       padding: 2rem;
     }
 
-    /* Header */
+    
     h1 {
       font-size: 3em;
       font-weight: normal;
@@ -52,7 +52,7 @@
       border: 1px solid #39ff14;
     }
 
-    /* Style toggle */
+    
     #style-toggle {
       text-align: right;
       margin-bottom: 1rem;
@@ -66,7 +66,7 @@
       border: 1px solid #39ff14;
     }
 
-    /* Filename input */
+    
     #filename {
       display: block;
       width: 300px;
@@ -75,10 +75,10 @@
       padding: 10px;
       border: 1px solid #39ff14;
       background: #003000;
-      color: #39ff14; /* FIXED: green text */
+      color: #39ff14; 
     }
 
-    /* Item block */
+   
     .item-block {
       border: 1px solid #39ff14;
       background: #003300;
@@ -86,7 +86,7 @@
       margin-bottom: 2rem;
     }
 
-    /* Labels */
+   
     label {
       font-size: 20px;
       padding: 10px;
@@ -96,14 +96,14 @@
       display: block;
     }
 
-    /* Inputs */
+  
     input[type="text"],
     input[type="number"],
     select {
       height: 50px;
       font-size: 20px;
       background: #003000;
-      color: #39ff14; /* FIXED: green text */
+      color: #39ff14; 
       border: 1px solid #39ff14;
       width: 100%;
     }
@@ -115,7 +115,7 @@
       outline: 2px solid #39ff14;
     }
 
-    /* Sliders */
+    
     input[type="range"] {
       -webkit-appearance: none;
       width: 100%;
@@ -131,7 +131,7 @@
       border: none;
     }
 
-    /* Buttons */
+    
     button {
       height: 50px;
       font-size: 18px;
@@ -146,7 +146,7 @@
       background: #004000;
     }
 
-    /* Template buttons */
+    
     .template-buttons {
       display: flex;
       flex-wrap: wrap;
@@ -164,7 +164,7 @@
       border: 1px solid #39ff14;
     }
 
-    /* Swatch preview inside template buttons */
+    
     .template-buttons span {
       width: 20px;
       height: 20px;
@@ -172,7 +172,7 @@
       border: 1px solid white;
     }
 
-    /* JSON preview */
+  
     #json-output {
       background: #001f00;
       color: #39ff14;
@@ -188,9 +188,9 @@
 </head>
 <body>
   <div id="app">
-    <h1>Stash JSON Maker</h1>
+    <h1>Kyoshades PC Stash JSON Maker</h1>
 
-    <input type="text" id="filename" placeholder="Enter filename..." />
+    <input type="text" id="filename" placeholder="Enter filename :3" />
 
     <div id="editor"></div>
     <button id="downloadBtn">Download JSON</button>
@@ -384,8 +384,11 @@
 <option value="item_teleport_gun">Teleport Gun</option>
 <option value="item_golden_grenade">Golden Grenade</option>
 <option value="item_cutie_dead">Dead Cuite/Seal</option>
-<option value="item_goop">Goop</option>
+<option value="item_friend_launcher">Friend Launcher</option>
+<option value="item_grenade_launcher">Grenade Launcher</option>
 <option value="item_goopfish">GoopFish</option>
+<option value="item_goop">Goop</option>
+<option value="item_boomerang">Boomerang *UNRELEASED* Invisable in Stash and you cant take it out btw</option>
        
     </datalist>
   </div>
@@ -489,33 +492,6 @@
         };
         controls.appendChild(addChildBtn);
 
-        const copyBtn = document.createElement('button');
-        copyBtn.textContent = 'Copy';
-        copyBtn.title = 'Copy this item';
-        copyBtn.onclick = async () => {
-          try {
-            await navigator.clipboard.writeText(JSON.stringify(item));
-          } catch (e) {
-            alert('Clipboard permission denied or unsupported.');
-          }
-        };
-        controls.appendChild(copyBtn);
-
-        const pasteBtn = document.createElement('button');
-        pasteBtn.textContent = 'Paste';
-        pasteBtn.title = 'Paste over this item';
-        pasteBtn.onclick = async () => {
-          try {
-            const text = await navigator.clipboard.readText();
-            const data = JSON.parse(text);
-            Object.assign(item, data);
-            renderEditor();
-          } catch (e) {
-            alert('Clipboard read failed.');
-          }
-        };
-        controls.appendChild(pasteBtn);
-
         row.appendChild(controls);
 
         const childrenContainer = document.createElement('div');
@@ -592,5 +568,6 @@
 
     renderEditor();
   </script>
+<div id="oculus-warning">**Does not work on Oculus without a password idk why**</div>
 </body>
 </html>
