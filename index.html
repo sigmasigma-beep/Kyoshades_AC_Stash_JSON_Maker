@@ -461,9 +461,9 @@
           return container;
         };
 
-        controls.appendChild(addSlider('Hue:', 0, 360, 1, item.colorHue, e => item.colorHue = parseInt(e.target.value)));
-        controls.appendChild(addSlider('Saturation:', 0, 100, 1, item.colorSaturation, e => item.colorSaturation = parseInt(e.target.value)));
-        controls.appendChild(addSlider('Scale Modifier:', 0, 5, 0.01, item.scaleModifier, e => item.scaleModifier = parseFloat(e.target.value)));
+        controls.appendChild(addSlider('Hue:', 0, 210, 0, item.colorHue, e => item.colorHue = parseInt(e.target.value)));
+        controls.appendChild(addSlider('Saturation:', 0, 120, 0, item.colorSaturation, e => item.colorSaturation = parseInt(e.target.value)));
+        controls.appendChild(addSlider('Scale Modifier:', -127, 127, 0, item.scaleModifier, e => item.scaleModifier = parseFloat(e.target.value)));
 
         const removeBtn = document.createElement('button');
         removeBtn.textContent = 'x';
