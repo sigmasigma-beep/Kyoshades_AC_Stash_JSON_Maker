@@ -459,20 +459,35 @@ const itemOptions = [
       controls.appendChild(toggleBtn);
 
 
-      const itemIDSelect = document.createElement('select');
+            const itemIDSelect = document.createElement('select');
       itemIDSelect.className = 'itemID';
       itemIDSelect.title = 'Select or type item ID';
-      itemIDSelect.value = item.itemID;
+
+      // Always include a blank option
       const blankOption = document.createElement('option');
       blankOption.value = '';
       blankOption.textContent = '(none)';
       itemIDSelect.appendChild(blankOption);
+
+      // Build all predefined options
       itemOptions.forEach(opt => {
         const option = document.createElement('option');
         option.value = opt;
         option.textContent = opt;
         itemIDSelect.appendChild(option);
       });
+
+      // If the current itemID isn’t in itemOptions, add it manually
+      if (item.itemID && !itemOptions.includes(item.itemID)) {
+        const customOption = document.createElement('option');
+        customOption.value = item.itemID;
+        customOption.textContent = item.itemID + " (custom)";
+        itemIDSelect.appendChild(customOption);
+      }
+
+      // Finally set the value
+      itemIDSelect.value = item.itemID || '';
+
       itemIDSelect.oninput = e => {
         item.itemID = e.target.value;
         updateOutput();
@@ -481,6 +496,8 @@ const itemOptions = [
         item.itemID = e.target.value;
         updateOutput();
       };
+      controls.appendChild(itemIDSelect);
+
       controls.appendChild(itemIDSelect);
 
 
