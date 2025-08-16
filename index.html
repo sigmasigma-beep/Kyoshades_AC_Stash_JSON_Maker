@@ -30,6 +30,53 @@
     color: #39ff14;
   }
 
+#store-section {
+  margin-top: 2rem;
+}
+
+#store-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.store-block {
+  border: 1px solid #39ff14;
+  background: #003300;
+  padding: 8px;
+  width: calc(25% - 12px); /* 4 per row */
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.store-block h4 {
+  margin: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.store-block pre {
+  background: #001a00;
+  border: 1px solid #39ff14;
+  padding: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  display: none; /* hidden by default */
+  font-size: 12px;
+}
+
+.store-block button {
+  font-size: 12px;
+  padding: 4px 6px;
+  margin-top: 2px;
+  cursor: pointer;
+}
+
+  
   #app {
     max-width: 1000px;
     margin: auto;
@@ -195,7 +242,23 @@
 
   <pre id="json-output"></pre>
 
-  <div id="oculus-warning">**Fixed The item updateing bug**</div>
+<div id="store-section">
+  <h2>JSON Store</h2>
+
+  <div id="store-upload">
+    <input type="file" id="store-file-input" accept=".json">
+    <button id="store-upload-btn">Upload JSON</button>
+  </div>
+
+  <div id="store-list"></div>
+</div>
+
+</div>
+
+
+
+  
+  
 </div>
 
 <script>
@@ -629,6 +692,96 @@ const itemOptions = [
     renderEditor();
   });
 
+const storeFileInput = document.getElementById('store-file-input');
+const storeUploadBtn = document.getElementById('store-upload-btn');
+const storeList = document.getElementById('store-list');
+
+// Load existing JSONs from localStorage
+let storeJSONs = JSON.parse(localStorage.getItem('jsonStore')) || [];
+
+function saveStore() {
+  localStorage.setItem('jsonStore', JSON.stringify(storeJSONs));
+}
+
+function renderStore() {
+  storeList.innerHTML = '';
+  storeJSONs.forEach((item, idx) => {
+    const block = document.createElement('div');
+    block.className = 'store-block';
+
+    const title = document.createElement('h4');
+    title.textContent = item.name;
+    block.appendChild(title);
+
+    const pre = document.createElement('pre');
+    pre.textContent = JSON.stringify(item.data, null, 2);
+    block.appendChild(pre);
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'Show Preview';
+    toggleBtn.onclick = () => {
+      if (pre.style.display === 'none') {
+        pre.style.display = 'block';
+        toggleBtn.textContent = 'Hide Preview';
+      } else {
+        pre.style.display = 'none';
+        toggleBtn.textContent = 'Show Preview';
+      }
+    };
+    block.appendChild(toggleBtn);
+
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = 'Download';
+    downloadBtn.onclick = () => {
+      const blob = new Blob([JSON.stringify(item.data, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = item.name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+    block.appendChild(downloadBtn);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.onclick = () => {
+      if (confirm(`Delete "${item.name}" from store?`)) {
+        storeJSONs.splice(idx, 1);
+        saveStore();
+        renderStore();
+      }
+    };
+    block.appendChild(deleteBtn);
+
+    storeList.appendChild(block);
+  });
+}
+
+// Upload handler
+storeUploadBtn.addEventListener('click', () => {
+  const file = storeFileInput.files[0];
+  if (!file) return alert('Select a JSON file first.');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      storeJSONs.push({ name: file.name, data });
+      saveStore();
+      renderStore();
+      storeFileInput.value = '';
+    } catch (err) {
+      alert('Invalid JSON file!');
+    }
+  };
+  reader.readAsText(file);
+});
+
+// Initial render
+renderStore();
+
+
+  
   downloadBtn.addEventListener('click', downloadJSON);
 
   renderEditor();
