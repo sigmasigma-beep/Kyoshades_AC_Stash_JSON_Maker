@@ -913,120 +913,154 @@ const itemOptions = [
     renderEditor();
   });
 
-const storeFileInput = document.getElementById('store-file-input');
-const storeUploadBtn = document.getElementById('store-upload-btn');
-const storeList = document.getElementById('store-list');
-const toggleStoreBtn = document.getElementById('toggle-store-btn');
+<script>
+  // Firebase references
+  const storeFileInput = document.getElementById('store-file-input');
+  const storeUploadBtn = document.getElementById('store-upload-btn');
+  const storeList = document.getElementById('store-list');
+  const storeTagsInput = document.getElementById('store-tags-input');
+  const storeSearch = document.getElementById('store-search');
+  const toggleStoreBtn = document.getElementById('toggle-store-btn');
 
-// Reference Firestore collection
-const storeCollection = db.collection('jsonStore');
+  const bannedWords = ['badword1','badword2','slur1','slur2']; // add your banned words here
 
-// Create store block (matches editor style)
-function createStoreBlock(itemDoc) {
-  const data = itemDoc.data();
-  const block = document.createElement('div');
-  block.className = 'item-block';
-  block.style.width = '23%';
-  block.style.display = 'inline-block';
-  block.style.margin = '1%';
-  block.style.verticalAlign = 'top';
+  const db = firebase.firestore();
+  const storage = firebase.storage();
 
-  const title = document.createElement('h4');
-  title.textContent = data.name;
-  title.style.fontSize = '16px';
-  title.style.marginBottom = '8px';
-  block.appendChild(title);
+  // Create store block
+  function createStoreBlock(item) {
+    const container = document.createElement('div');
+    container.className = 'item-block';
+    container.style.width = '23%';
+    container.style.display = 'inline-block';
+    container.style.margin = '1%';
+    container.style.verticalAlign = 'top';
 
-  const pre = document.createElement('pre');
-  pre.textContent = JSON.stringify(data.json, null, 2);
-  pre.style.display = 'none';
-  pre.style.fontSize = '12px';
-  pre.style.maxHeight = '150px';
-  pre.style.overflowY = 'auto';
-  pre.style.background = '#001a00';
-  pre.style.color = '#39ff14';
-  pre.style.padding = '6px';
-  pre.style.border = '1px solid #39ff14';
-  block.appendChild(pre);
+    const title = document.createElement('h4');
+    title.textContent = item.name;
+    title.style.fontSize = '16px';
+    container.appendChild(title);
 
-  const toggleBtn = document.createElement('button');
-  toggleBtn.textContent = 'Show JSON';
-  toggleBtn.onclick = () => {
-    if (pre.style.display === 'none') {
-      pre.style.display = 'block';
-      toggleBtn.textContent = 'Hide JSON';
-    } else {
-      pre.style.display = 'none';
-      toggleBtn.textContent = 'Show JSON';
-    }
-  };
-  block.appendChild(toggleBtn);
+    const tagsDiv = document.createElement('div');
+    tagsDiv.textContent = item.tags ? item.tags.join(', ') : '';
+    tagsDiv.style.fontSize = '12px';
+    tagsDiv.style.marginBottom = '6px';
+    container.appendChild(tagsDiv);
 
-  const downloadBtn = document.createElement('button');
-  downloadBtn.textContent = 'Download';
-  downloadBtn.onclick = () => {
-    const blob = new Blob([JSON.stringify(data.json, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = data.name;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  block.appendChild(downloadBtn);
+    const pre = document.createElement('pre');
+    pre.style.display = 'none';
+    pre.style.fontSize = '12px';
+    pre.style.maxHeight = '150px';
+    pre.style.overflowY = 'auto';
+    pre.style.background = '#001a00';
+    pre.style.color = '#39ff14';
+    pre.style.padding = '6px';
+    pre.style.border = '1px solid #39ff14';
+    container.appendChild(pre);
 
-  return block;
-}
-
-// Render store from Firestore
-function renderStore(filter = '') {
-  storeList.innerHTML = '';
-  storeCollection.get().then(snapshot => {
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      if (data.name.toLowerCase().includes(filter.toLowerCase()) || (data.tags && data.tags.some(tag => tag.toLowerCase().includes(filter.toLowerCase())))) {
-        const block = createStoreBlock(doc);
-        storeList.appendChild(block);
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'Show JSON';
+    toggleBtn.onclick = () => {
+      if (pre.style.display === 'none') {
+        pre.style.display = 'block';
+        pre.textContent = JSON.stringify(item.data, null, 2);
+        toggleBtn.textContent = 'Hide JSON';
+      } else {
+        pre.style.display = 'none';
+        toggleBtn.textContent = 'Show JSON';
       }
+    };
+    container.appendChild(toggleBtn);
+
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = 'Download';
+    downloadBtn.onclick = () => {
+      // download from storage
+      storage.ref(item.storagePath).getDownloadURL().then(url => {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = item.name || 'stash.json';
+        a.click();
+      });
+    };
+    container.appendChild(downloadBtn);
+
+    return container;
+  }
+
+  // Render the store from Firestore
+  function renderStore() {
+    const queryText = storeSearch.value.toLowerCase();
+    storeList.innerHTML = '';
+
+    db.collection('jsonStore').orderBy('timestamp','desc').get().then(snapshot => {
+      snapshot.forEach(doc => {
+        const item = doc.data();
+        const matchTitle = item.name && item.name.toLowerCase().includes(queryText);
+        const matchTags = item.tags && item.tags.some(tag => tag.toLowerCase().includes(queryText));
+        if (!queryText || matchTitle || matchTags) {
+          storeList.appendChild(createStoreBlock(item));
+        }
+      });
     });
-  });
-}
+  }
 
-// Upload handler
-storeUploadBtn.addEventListener('click', () => {
-  const file = storeFileInput.files[0];
-  if (!file) return alert('Select a JSON file first.');
+  // Upload JSON to Firebase Storage & Firestore
+  storeUploadBtn.onclick = () => {
+    const file = storeFileInput.files[0];
+    if (!file) return alert('Select a JSON file first.');
 
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const jsonData = JSON.parse(e.target.result);
+    const tags = storeTagsInput.value.split(',').map(t => t.trim()).filter(t => t);
 
-      // Add to Firestore
-      const name = file.name;
-      storeCollection.add({ name, json: jsonData, createdAt: firebase.firestore.FieldValue.serverTimestamp() })
-        .then(() => {
-          alert('Uploaded successfully!');
-          renderStore();
-          storeFileInput.value = '';
-        })
-        .catch(err => alert('Upload failed: ' + err));
-    } catch (err) {
-      alert('Invalid JSON file!');
+    // validate tags
+    for (let tag of tags) {
+      for (let banned of bannedWords) {
+        if (tag.toLowerCase().includes(banned)) return alert('Invalid tag: ' + tag);
+      }
+    }
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const data = JSON.parse(e.target.result);
+        const storageRef = storage.ref('jsonStore/' + Date.now() + '_' + file.name);
+        storageRef.putString(JSON.stringify(data)).then(snapshot => {
+          db.collection('jsonStore').add({
+            name: file.name,
+            tags,
+            storagePath: snapshot.ref.fullPath,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            data // optional: store JSON in Firestore for preview
+          }).then(() => {
+            alert('Uploaded successfully!');
+            renderStore();
+            storeFileInput.value = '';
+            storeTagsInput.value = '';
+          });
+        });
+      } catch (err) {
+        alert('Invalid JSON file!');
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  storeSearch.addEventListener('input', renderStore);
+
+  // Toggle store
+  toggleStoreBtn.onclick = () => {
+    if (storeList.style.display === 'none') {
+      storeList.style.display = 'flex';
+      toggleStoreBtn.textContent = 'Hide Store';
+    } else {
+      storeList.style.display = 'none';
+      toggleStoreBtn.textContent = 'Show Store';
     }
   };
-  reader.readAsText(file);
-});
 
-// Optional: Toggle hide/show store
-if (toggleStoreBtn) {
-  toggleStoreBtn.addEventListener('click', () => {
-    storeList.parentElement.style.display =
-      storeList.parentElement.style.display === 'none' ? 'block' : 'none';
-  });
-}
-
-// Initial render
-renderStore();
+  // Initial render
+  renderStore();
+</script>
 
 
 
