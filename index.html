@@ -266,115 +266,85 @@
 
   <pre id="json-output"></pre>
 
+
+</script>
+
 <div id="store-section">
   <h2>JSON Store</h2>
-
-  <div id="store-upload" style="margin-bottom:1rem;">
-    <input type="file" id="store-file-input" accept=".json">
-    <input type="text" id="store-tags" placeholder="Add tags (comma-separated)">
-    <button id="store-upload-btn">Upload JSON</button>
-  </div>
-
-  <input type="text" id="store-search" placeholder="Search by title or tags" style="margin-bottom:1rem; width:100%; padding:6px; font-size:16px; background:#003000; color:#39ff14; border:1px solid #39ff14;">
-
-  <div id="store-list" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+  <input type="file" id="store-file-input" accept=".json" />
+  <input type="text" id="store-tags" placeholder="Enter tags, comma-separated" />
+  <button id="store-upload-btn">Upload JSON</button>
+  <input type="text" id="store-search" placeholder="Search store by name or tag" />
+  <div id="store-list"></div>
 </div>
 
 <script>
-const storeFileInput = document.getElementById('store-file-input');
-const storeUploadBtn = document.getElementById('store-upload-btn');
-const storeList = document.getElementById('store-list');
-const storeTagsInput = document.getElementById('store-tags');
-const storeSearchInput = document.getElementById('store-search');
+  const storeFileInput = document.getElementById('store-file-input');
+  const storeUploadBtn = document.getElementById('store-upload-btn');
+  const storeList = document.getElementById('store-list');
+  const storeTagsInput = document.getElementById('store-tags');
+  const storeSearchInput = document.getElementById('store-search');
 
-// Firebase references
-const storageRef = firebase.storage().ref();
-const storeCollection = firebase.firestore().collection('jsonStore');
+  const bannedWords = ['badword1','badword2','slur1','slur2'];
 
-// Helper to sanitize tags/text
-function sanitize(text) {
-  return text.replace(/[^\w\s,]/gi, '').toLowerCase();
-}
+  async function uploadJSONFile() {
+    const file = storeFileInput.files[0];
+    if (!file) return alert('Select a JSON file first.');
 
-// Upload JSON
-storeUploadBtn.addEventListener('click', async () => {
-  const file = storeFileInput.files[0];
-  if (!file) return alert('Select a JSON file first.');
+    const tags = storeTagsInput.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    for (let tag of tags) {
+      for (let banned of bannedWords) {
+        if (tag.includes(banned)) return alert('Invalid tag: ' + tag);
+      }
+    }
 
-  // Optional tags
-  let tags = storeTagsInput.value.split(',').map(t => sanitize(t.trim())).filter(Boolean);
+    try {
+      const storageFileRef = storage.ref('jsonStore/' + Date.now() + '_' + file.name);
+      await storageFileRef.put(file);
+      const downloadURL = await storageFileRef.getDownloadURL();
 
-  try {
-    const fileRef = storageRef.child('jsonStore/' + file.name);
-    await fileRef.put(file);
-    const url = await fileRef.getDownloadURL();
+      await db.collection('jsonStore').add({
+        name: file.name,
+        tags,
+        storagePath: storageFileRef.fullPath,
+        url: downloadURL,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+      });
 
-    await storeCollection.add({
-      name: file.name,
-      url: url,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      tags: tags
-    });
-
-    storeFileInput.value = '';
-    storeTagsInput.value = '';
-    renderStore();
-  } catch(err) {
-    console.error(err);
-    alert('Upload failed!');
+      storeFileInput.value = '';
+      storeTagsInput.value = '';
+      renderStore();
+      alert('Upload successful!');
+    } catch (err) {
+      console.error(err);
+      alert('Upload failed!');
+    }
   }
-});
 
-// Render JSONs
-async function renderStore() {
-  storeList.innerHTML = '';
-  const snapshot = await storeCollection.orderBy('createdAt', 'desc').get();
-  const searchQuery = sanitize(storeSearchInput.value);
+  storeUploadBtn.addEventListener('click', uploadJSONFile);
 
-  snapshot.forEach(doc => {
-    const item = doc.data();
-    const matchSearch = !searchQuery || 
-      item.name.toLowerCase().includes(searchQuery) ||
-      (item.tags && item.tags.some(tag => tag.includes(searchQuery)));
-    if(!matchSearch) return;
-
+  function createStoreBlock(item) {
     const block = document.createElement('div');
     block.className = 'store-block';
-    block.style.background = '#003300';
-    block.style.border = '1px solid #39ff14';
-    block.style.padding = '10px';
-    block.style.width = 'calc(25% - 10px)';
-    block.style.boxSizing = 'border-box';
 
     const title = document.createElement('h4');
     title.textContent = item.name;
-    title.style.fontSize = '16px';
-    title.style.marginBottom = '6px';
     block.appendChild(title);
 
     const tagDiv = document.createElement('div');
     tagDiv.textContent = 'Tags: ' + (item.tags?.join(', ') || 'None');
     tagDiv.style.fontSize = '12px';
-    tagDiv.style.marginBottom = '6px';
     block.appendChild(tagDiv);
 
     const pre = document.createElement('pre');
-    pre.style.display = 'none';
-    pre.style.background = '#001a00';
-    pre.style.color = '#39ff14';
-    pre.style.padding = '6px';
-    pre.style.fontSize = '12px';
-    pre.style.maxHeight = '150px';
-    pre.style.overflow = 'auto';
     block.appendChild(pre);
 
     const toggleBtn = document.createElement('button');
     toggleBtn.textContent = 'Show Preview';
-    toggleBtn.style.marginRight = '4px';
     toggleBtn.onclick = async () => {
       if (pre.style.display === 'none') {
-        const response = await fetch(item.url);
-        const data = await response.json();
+        const res = await fetch(item.url);
+        const data = await res.json();
         pre.textContent = JSON.stringify(data, null, 2);
         pre.style.display = 'block';
         toggleBtn.textContent = 'Hide Preview';
@@ -390,88 +360,38 @@ async function renderStore() {
     downloadBtn.onclick = () => {
       const a = document.createElement('a');
       a.href = item.url;
-      a.download = item.name;
+      a.download = item.name || 'stash.json';
       a.click();
     };
     block.appendChild(downloadBtn);
 
-    storeList.appendChild(block);
-  });
-}
+    return block;
+  }
 
-// Search filtering
-storeSearchInput.addEventListener('input', renderStore);
+  async function renderStore() {
+    storeList.innerHTML = '';
+    const searchQuery = storeSearchInput.value.trim().toLowerCase();
 
-// Initial render
-renderStore();
+    const snapshot = await db.collection('jsonStore').orderBy('timestamp', 'desc').get();
+    snapshot.forEach(doc => {
+      const item = doc.data();
+      const matches = !searchQuery ||
+        item.name.toLowerCase().includes(searchQuery) ||
+        (item.tags && item.tags.some(tag => tag.includes(searchQuery)));
+
+      if (matches) {
+        storeList.appendChild(createStoreBlock(item));
+      }
+    });
+  }
+
+  storeSearchInput.addEventListener('input', renderStore);
+
+  // Initial store render
+  renderStore();
 </script>
 
 
-  const downloadBtn = document.createElement('button');
-  downloadBtn.textContent = 'Download';
-  downloadBtn.onclick = () => {
-    const blob = new Blob([JSON.stringify(item.data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = item.name || 'stash.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
-  container.appendChild(downloadBtn);
-
-  return container;
-}
-
-function renderStore() {
-  const query = storeSearch.value.toLowerCase();
-  storeList.innerHTML = '';
-  storeJSONs.forEach(item => {
-    const matchTitle = item.name && item.name.toLowerCase().includes(query);
-    const matchTags = item.tags && item.tags.some(tag => tag.toLowerCase().includes(query));
-    if (!query || matchTitle || matchTags) {
-      storeList.appendChild(createStoreBlock(item));
-    }
-  });
-}
-
-toggleStoreBtn.onclick = () => {
-  if (storeList.style.display === 'none') {
-    storeList.style.display = 'flex';
-    toggleStoreBtn.textContent = 'Hide Store';
-  } else {
-    storeList.style.display = 'none';
-    toggleStoreBtn.textContent = 'Show Store';
-  }
-};
-
-storeUploadBtn.onclick = () => {
-  const file = storeFileInput.files[0];
-  if (!file) return alert('Select a JSON file first.');
-  const tags = storeTagsInput.value.split(',').map(t => t.trim()).filter(t => t);
-  for (let tag of tags) {
-    for (let banned of bannedWords) {
-      if (tag.toLowerCase().includes(banned)) return alert('Invalid tag: ' + tag);
-    }
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      storeJSONs.push({ name: file.name, data, tags });
-      saveStore();
-      renderStore();
-      storeFileInput.value = '';
-      storeTagsInput.value = '';
-    } catch (err) {
-      alert('Invalid JSON file!');
-    }
-  };
-  reader.readAsText(file);
-};
-
-storeSearch.addEventListener('input', renderStore);
-
-renderStore();
 </script>
 
 </div>
@@ -912,156 +832,6 @@ const itemOptions = [
     });
     renderEditor();
   });
-
-<script>
-  // Firebase references
-  const storeFileInput = document.getElementById('store-file-input');
-  const storeUploadBtn = document.getElementById('store-upload-btn');
-  const storeList = document.getElementById('store-list');
-  const storeTagsInput = document.getElementById('store-tags-input');
-  const storeSearch = document.getElementById('store-search');
-  const toggleStoreBtn = document.getElementById('toggle-store-btn');
-
-  const bannedWords = ['badword1','badword2','slur1','slur2']; // add your banned words here
-
-  const db = firebase.firestore();
-  const storage = firebase.storage();
-
-  // Create store block
-  function createStoreBlock(item) {
-    const container = document.createElement('div');
-    container.className = 'item-block';
-    container.style.width = '23%';
-    container.style.display = 'inline-block';
-    container.style.margin = '1%';
-    container.style.verticalAlign = 'top';
-
-    const title = document.createElement('h4');
-    title.textContent = item.name;
-    title.style.fontSize = '16px';
-    container.appendChild(title);
-
-    const tagsDiv = document.createElement('div');
-    tagsDiv.textContent = item.tags ? item.tags.join(', ') : '';
-    tagsDiv.style.fontSize = '12px';
-    tagsDiv.style.marginBottom = '6px';
-    container.appendChild(tagsDiv);
-
-    const pre = document.createElement('pre');
-    pre.style.display = 'none';
-    pre.style.fontSize = '12px';
-    pre.style.maxHeight = '150px';
-    pre.style.overflowY = 'auto';
-    pre.style.background = '#001a00';
-    pre.style.color = '#39ff14';
-    pre.style.padding = '6px';
-    pre.style.border = '1px solid #39ff14';
-    container.appendChild(pre);
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.textContent = 'Show JSON';
-    toggleBtn.onclick = () => {
-      if (pre.style.display === 'none') {
-        pre.style.display = 'block';
-        pre.textContent = JSON.stringify(item.data, null, 2);
-        toggleBtn.textContent = 'Hide JSON';
-      } else {
-        pre.style.display = 'none';
-        toggleBtn.textContent = 'Show JSON';
-      }
-    };
-    container.appendChild(toggleBtn);
-
-    const downloadBtn = document.createElement('button');
-    downloadBtn.textContent = 'Download';
-    downloadBtn.onclick = () => {
-      // download from storage
-      storage.ref(item.storagePath).getDownloadURL().then(url => {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = item.name || 'stash.json';
-        a.click();
-      });
-    };
-    container.appendChild(downloadBtn);
-
-    return container;
-  }
-
-  // Render the store from Firestore
-  function renderStore() {
-    const queryText = storeSearch.value.toLowerCase();
-    storeList.innerHTML = '';
-
-    db.collection('jsonStore').orderBy('timestamp','desc').get().then(snapshot => {
-      snapshot.forEach(doc => {
-        const item = doc.data();
-        const matchTitle = item.name && item.name.toLowerCase().includes(queryText);
-        const matchTags = item.tags && item.tags.some(tag => tag.toLowerCase().includes(queryText));
-        if (!queryText || matchTitle || matchTags) {
-          storeList.appendChild(createStoreBlock(item));
-        }
-      });
-    });
-  }
-
-  // Upload JSON to Firebase Storage & Firestore
-  storeUploadBtn.onclick = () => {
-    const file = storeFileInput.files[0];
-    if (!file) return alert('Select a JSON file first.');
-
-    const tags = storeTagsInput.value.split(',').map(t => t.trim()).filter(t => t);
-
-    // validate tags
-    for (let tag of tags) {
-      for (let banned of bannedWords) {
-        if (tag.toLowerCase().includes(banned)) return alert('Invalid tag: ' + tag);
-      }
-    }
-
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const data = JSON.parse(e.target.result);
-        const storageRef = storage.ref('jsonStore/' + Date.now() + '_' + file.name);
-        storageRef.putString(JSON.stringify(data)).then(snapshot => {
-          db.collection('jsonStore').add({
-            name: file.name,
-            tags,
-            storagePath: snapshot.ref.fullPath,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            data // optional: store JSON in Firestore for preview
-          }).then(() => {
-            alert('Uploaded successfully!');
-            renderStore();
-            storeFileInput.value = '';
-            storeTagsInput.value = '';
-          });
-        });
-      } catch (err) {
-        alert('Invalid JSON file!');
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  storeSearch.addEventListener('input', renderStore);
-
-  // Toggle store
-  toggleStoreBtn.onclick = () => {
-    if (storeList.style.display === 'none') {
-      storeList.style.display = 'flex';
-      toggleStoreBtn.textContent = 'Hide Store';
-    } else {
-      storeList.style.display = 'none';
-      toggleStoreBtn.textContent = 'Show Store';
-    }
-  };
-
-  // Initial render
-  renderStore();
-</script>
-
 
 
   
