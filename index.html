@@ -243,6 +243,145 @@
   <pre id="json-output"></pre>
 
 </script>
+
+<div id="store-section">
+  <h2>Local JSON Store</h2>
+  <input type="file" id="store-file-input" accept=".json" />
+  <input type="text" id="store-tags" placeholder="Enter tags, comma-separated" />
+  <button id="store-upload-btn">Upload JSON</button>
+  <input type="text" id="store-search" placeholder="Search store by name or tag" />
+  <div id="store-list"></div>
+</div>
+
+<script>
+const storeFileInput = document.getElementById('store-file-input');
+const storeUploadBtn = document.getElementById('store-upload-btn');
+const storeList = document.getElementById('store-list');
+const storeTagsInput = document.getElementById('store-tags');
+const storeSearchInput = document.getElementById('store-search');
+
+const bannedWords = ['badword1','badword2','slur1','slur2'];
+
+// Upload JSON file to localStorage
+storeUploadBtn.addEventListener('click', async () => {
+  const file = storeFileInput.files[0];
+  if (!file) return alert('Select a JSON file first.');
+
+  const tags = storeTagsInput.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+  for (let tag of tags) {
+    for (let banned of bannedWords) {
+      if (tag.includes(banned)) return alert('Invalid tag: ' + tag);
+    }
+  }
+
+  const text = await file.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return alert('Invalid JSON!');
+  }
+
+  const id = Date.now() + '_' + file.name;
+  const storeItem = {
+    id,
+    name: file.name,
+    tags,
+    data,
+    timestamp: new Date().toISOString()
+  };
+
+  localStorage.setItem(id, JSON.stringify(storeItem));
+  storeFileInput.value = '';
+  storeTagsInput.value = '';
+  renderStore();
+});
+
+// Render store
+function renderStore() {
+  storeList.innerHTML = '';
+  const searchQuery = storeSearchInput.value.trim().toLowerCase();
+
+  const allItems = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    try {
+      const item = JSON.parse(localStorage.getItem(key));
+      if (item && item.data) allItems.push(item);
+    } catch {}
+  }
+
+  allItems
+    .sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .forEach(item => {
+      const matches = !searchQuery ||
+        item.name.toLowerCase().includes(searchQuery) ||
+        (item.tags && item.tags.some(tag => tag.includes(searchQuery)));
+
+      if (matches) storeList.appendChild(createStoreBlock(item));
+    });
+}
+
+function createStoreBlock(item) {
+  const block = document.createElement('div');
+  block.className = 'store-block';
+
+  const title = document.createElement('h4');
+  title.textContent = item.name;
+  block.appendChild(title);
+
+  const tagDiv = document.createElement('div');
+  tagDiv.textContent = 'Tags: ' + (item.tags?.join(', ') || 'None');
+  tagDiv.style.fontSize = '12px';
+  block.appendChild(tagDiv);
+
+  const pre = document.createElement('pre');
+  pre.style.display = 'none';
+  block.appendChild(pre);
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.textContent = 'Show Preview';
+  toggleBtn.onclick = () => {
+    if (pre.style.display === 'none') {
+      pre.textContent = JSON.stringify(item.data, null, 2);
+      pre.style.display = 'block';
+      toggleBtn.textContent = 'Hide Preview';
+    } else {
+      pre.style.display = 'none';
+      toggleBtn.textContent = 'Show Preview';
+    }
+  };
+  block.appendChild(toggleBtn);
+
+  const copyBtn = document.createElement('button');
+  copyBtn.textContent = 'Copy';
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(JSON.stringify(item.data, null, 2));
+    alert('Copied to clipboard!');
+  };
+  block.appendChild(copyBtn);
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.onclick = () => {
+    if (confirm(`Delete stash "${item.name}"?`)) {
+      localStorage.removeItem(item.id);
+      renderStore();
+    }
+  };
+  block.appendChild(deleteBtn);
+
+  return block;
+}
+
+// Search filter
+storeSearchInput.addEventListener('input', renderStore);
+
+// Initial render
+renderStore();
+</script>
+
+
 </script>
 </div>
 </div>
