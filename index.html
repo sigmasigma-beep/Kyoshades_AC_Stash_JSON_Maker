@@ -8,20 +8,24 @@
 <script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-storage-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyA2flW3Fd4SPYihrsa-mtp2i6Zei_0wO8M",
-    authDomain: "stash-gen-api.firebaseapp.com",
-    projectId: "stash-gen-api",
-    storageBucket: "stash-gen-api.appspot.com",
-    messagingSenderId: "151976728938",
-    appId: "1:151976728938:web:0dc8e3f6573bd1b9126d13",
-    measurementId: "G-2GFFXME00R"
-  };
+  window.addEventListener('load', () => {
+    const firebaseConfig = {
+      apiKey: "AIzaSyA2flW3Fd4SPYihrsa-mtp2i6Zei_0wO8M",
+      authDomain: "stash-gen-api.firebaseapp.com",
+      projectId: "stash-gen-api",
+      storageBucket: "stash-gen-api.appspot.com",
+      messagingSenderId: "151976728938",
+      appId: "1:151976728938:web:0dc8e3f6573bd1b9126d13",
+      measurementId: "G-2GFFXME00R"
+    };
 
-  firebase.initializeApp(firebaseConfig);
-  const analytics = firebase.analytics();
-  const db = firebase.firestore();
-  const storage = firebase.storage();
+    firebase.initializeApp(firebaseConfig);
+    const analytics = firebase.analytics();
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    console.log('Firebase initialized successfully!');
+  });
 </script>
 
   
