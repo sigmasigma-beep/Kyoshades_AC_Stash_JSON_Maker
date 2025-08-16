@@ -1,6 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+
+<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-analytics-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.6.1/firebase-storage-compat.js"></script>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyA2flW3Fd4SPYihrsa-mtp2i6Zei_0wO8M",
+    authDomain: "stash-gen-api.firebaseapp.com",
+    projectId: "stash-gen-api",
+    storageBucket: "stash-gen-api.appspot.com",
+    messagingSenderId: "151976728938",
+    appId: "1:151976728938:web:0dc8e3f6573bd1b9126d13",
+    measurementId: "G-2GFFXME00R"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const analytics = firebase.analytics();
+  const db = firebase.firestore();
+  const storage = firebase.storage();
+</script>
+
+  
 <meta charset="UTF-8" />
 <title>Kyoshade's Sigma Stash JSON Maker</title>
 <style>
@@ -243,71 +267,145 @@
   <pre id="json-output"></pre>
 
 <div id="store-section">
-  <h2>JSON Store <button id="toggle-store-btn">Hide Store</button></h2>
+  <h2>JSON Store</h2>
 
-  <div id="store-upload">
+  <div id="store-upload" style="margin-bottom:1rem;">
     <input type="file" id="store-file-input" accept=".json">
-    <input type="text" id="store-tags-input" placeholder="Add tags separated by commas">
+    <input type="text" id="store-tags" placeholder="Add tags (comma-separated)">
     <button id="store-upload-btn">Upload JSON</button>
   </div>
 
-  <input type="text" id="store-search" placeholder="Search by title or tags">
+  <input type="text" id="store-search" placeholder="Search by title or tags" style="margin-bottom:1rem; width:100%; padding:6px; font-size:16px; background:#003000; color:#39ff14; border:1px solid #39ff14;">
 
-  <div id="store-list" style="display: flex; flex-wrap: wrap; gap: 16px;"></div>
+  <div id="store-list" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
 </div>
 
 <script>
-const storeSection = document.getElementById('store-section');
-const toggleStoreBtn = document.getElementById('toggle-store-btn');
 const storeFileInput = document.getElementById('store-file-input');
 const storeUploadBtn = document.getElementById('store-upload-btn');
-const storeTagsInput = document.getElementById('store-tags-input');
-const storeSearch = document.getElementById('store-search');
 const storeList = document.getElementById('store-list');
+const storeTagsInput = document.getElementById('store-tags');
+const storeSearchInput = document.getElementById('store-search');
 
-let storeJSONs = JSON.parse(localStorage.getItem('storeJSONs')) || [];
-const bannedWords = ['badword1','badword2','slur1','slur2']; // add banned words
+// Firebase references
+const storageRef = firebase.storage().ref();
+const storeCollection = firebase.firestore().collection('jsonStore');
 
-function saveStore() {
-  localStorage.setItem('storeJSONs', JSON.stringify(storeJSONs));
+// Helper to sanitize tags/text
+function sanitize(text) {
+  return text.replace(/[^\w\s,]/gi, '').toLowerCase();
 }
 
-function createStoreBlock(item) {
-  const container = document.createElement('div');
-  container.className = 'item-block';
-  container.style.width = '23%'; // 4 per row
+// Upload JSON
+storeUploadBtn.addEventListener('click', async () => {
+  const file = storeFileInput.files[0];
+  if (!file) return alert('Select a JSON file first.');
 
-  const title = document.createElement('div');
-  title.textContent = item.name || 'Untitled JSON';
-  title.style.fontWeight = 'bold';
-  container.appendChild(title);
+  // Optional tags
+  let tags = storeTagsInput.value.split(',').map(t => sanitize(t.trim())).filter(Boolean);
 
-  const tags = document.createElement('div');
-  tags.textContent = 'Tags: ' + (item.tags || []).join(', ');
-  tags.style.fontSize = '12px';
-  tags.style.color = '#66ff66';
-  container.appendChild(tags);
+  try {
+    const fileRef = storageRef.child('jsonStore/' + file.name);
+    await fileRef.put(file);
+    const url = await fileRef.getDownloadURL();
 
-  const previewBtn = document.createElement('button');
-  previewBtn.textContent = 'Show JSON';
-  container.appendChild(previewBtn);
+    await storeCollection.add({
+      name: file.name,
+      url: url,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      tags: tags
+    });
 
-  const pre = document.createElement('pre');
-  pre.textContent = JSON.stringify(item.data, null, 2);
-  pre.style.display = 'none';
-  pre.style.maxHeight = '150px';
-  pre.style.overflowY = 'auto';
-  container.appendChild(pre);
+    storeFileInput.value = '';
+    storeTagsInput.value = '';
+    renderStore();
+  } catch(err) {
+    console.error(err);
+    alert('Upload failed!');
+  }
+});
 
-  previewBtn.onclick = () => {
-    if (pre.style.display === 'none') {
-      pre.style.display = 'block';
-      previewBtn.textContent = 'Hide JSON';
-    } else {
-      pre.style.display = 'none';
-      previewBtn.textContent = 'Show JSON';
-    }
-  };
+// Render JSONs
+async function renderStore() {
+  storeList.innerHTML = '';
+  const snapshot = await storeCollection.orderBy('createdAt', 'desc').get();
+  const searchQuery = sanitize(storeSearchInput.value);
+
+  snapshot.forEach(doc => {
+    const item = doc.data();
+    const matchSearch = !searchQuery || 
+      item.name.toLowerCase().includes(searchQuery) ||
+      (item.tags && item.tags.some(tag => tag.includes(searchQuery)));
+    if(!matchSearch) return;
+
+    const block = document.createElement('div');
+    block.className = 'store-block';
+    block.style.background = '#003300';
+    block.style.border = '1px solid #39ff14';
+    block.style.padding = '10px';
+    block.style.width = 'calc(25% - 10px)';
+    block.style.boxSizing = 'border-box';
+
+    const title = document.createElement('h4');
+    title.textContent = item.name;
+    title.style.fontSize = '16px';
+    title.style.marginBottom = '6px';
+    block.appendChild(title);
+
+    const tagDiv = document.createElement('div');
+    tagDiv.textContent = 'Tags: ' + (item.tags?.join(', ') || 'None');
+    tagDiv.style.fontSize = '12px';
+    tagDiv.style.marginBottom = '6px';
+    block.appendChild(tagDiv);
+
+    const pre = document.createElement('pre');
+    pre.style.display = 'none';
+    pre.style.background = '#001a00';
+    pre.style.color = '#39ff14';
+    pre.style.padding = '6px';
+    pre.style.fontSize = '12px';
+    pre.style.maxHeight = '150px';
+    pre.style.overflow = 'auto';
+    block.appendChild(pre);
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.textContent = 'Show Preview';
+    toggleBtn.style.marginRight = '4px';
+    toggleBtn.onclick = async () => {
+      if (pre.style.display === 'none') {
+        const response = await fetch(item.url);
+        const data = await response.json();
+        pre.textContent = JSON.stringify(data, null, 2);
+        pre.style.display = 'block';
+        toggleBtn.textContent = 'Hide Preview';
+      } else {
+        pre.style.display = 'none';
+        toggleBtn.textContent = 'Show Preview';
+      }
+    };
+    block.appendChild(toggleBtn);
+
+    const downloadBtn = document.createElement('button');
+    downloadBtn.textContent = 'Download';
+    downloadBtn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = item.url;
+      a.download = item.name;
+      a.click();
+    };
+    block.appendChild(downloadBtn);
+
+    storeList.appendChild(block);
+  });
+}
+
+// Search filtering
+storeSearchInput.addEventListener('input', renderStore);
+
+// Initial render
+renderStore();
+</script>
+
 
   const downloadBtn = document.createElement('button');
   downloadBtn.textContent = 'Download';
@@ -820,16 +918,12 @@ const storeUploadBtn = document.getElementById('store-upload-btn');
 const storeList = document.getElementById('store-list');
 const toggleStoreBtn = document.getElementById('toggle-store-btn');
 
-// Load existing JSONs from localStorage
-let storeJSONs = JSON.parse(localStorage.getItem('jsonStore')) || [];
-
-// Save store to localStorage
-function saveStore() {
-  localStorage.setItem('jsonStore', JSON.stringify(storeJSONs));
-}
+// Reference Firestore collection
+const storeCollection = db.collection('jsonStore');
 
 // Create store block (matches editor style)
-function createStoreBlock(item) {
+function createStoreBlock(itemDoc) {
+  const data = itemDoc.data();
   const block = document.createElement('div');
   block.className = 'item-block';
   block.style.width = '23%';
@@ -838,13 +932,13 @@ function createStoreBlock(item) {
   block.style.verticalAlign = 'top';
 
   const title = document.createElement('h4');
-  title.textContent = item.name;
+  title.textContent = data.name;
   title.style.fontSize = '16px';
   title.style.marginBottom = '8px';
   block.appendChild(title);
 
   const pre = document.createElement('pre');
-  pre.textContent = JSON.stringify(item.data, null, 2);
+  pre.textContent = JSON.stringify(data.json, null, 2);
   pre.style.display = 'none';
   pre.style.fontSize = '12px';
   pre.style.maxHeight = '150px';
@@ -871,10 +965,10 @@ function createStoreBlock(item) {
   const downloadBtn = document.createElement('button');
   downloadBtn.textContent = 'Download';
   downloadBtn.onclick = () => {
-    const blob = new Blob([JSON.stringify(item.data, null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data.json, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = item.name;
+    a.download = data.name;
     a.click();
     URL.revokeObjectURL(a.href);
   };
@@ -883,16 +977,17 @@ function createStoreBlock(item) {
   return block;
 }
 
-// Render the store
+// Render store from Firestore
 function renderStore(filter = '') {
   storeList.innerHTML = '';
-  const filtered = storeJSONs.filter(item =>
-    item.name.toLowerCase().includes(filter.toLowerCase())
-  );
-
-  filtered.forEach(item => {
-    const block = createStoreBlock(item);
-    storeList.appendChild(block);
+  storeCollection.get().then(snapshot => {
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data.name.toLowerCase().includes(filter.toLowerCase()) || (data.tags && data.tags.some(tag => tag.toLowerCase().includes(filter.toLowerCase())))) {
+        const block = createStoreBlock(doc);
+        storeList.appendChild(block);
+      }
+    });
   });
 }
 
@@ -904,11 +999,17 @@ storeUploadBtn.addEventListener('click', () => {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const data = JSON.parse(e.target.result);
-      storeJSONs.push({ name: file.name, data });
-      saveStore();
-      renderStore();
-      storeFileInput.value = '';
+      const jsonData = JSON.parse(e.target.result);
+
+      // Add to Firestore
+      const name = file.name;
+      storeCollection.add({ name, json: jsonData, createdAt: firebase.firestore.FieldValue.serverTimestamp() })
+        .then(() => {
+          alert('Uploaded successfully!');
+          renderStore();
+          storeFileInput.value = '';
+        })
+        .catch(err => alert('Upload failed: ' + err));
     } catch (err) {
       alert('Invalid JSON file!');
     }
