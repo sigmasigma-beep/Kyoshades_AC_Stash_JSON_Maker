@@ -243,15 +243,138 @@
   <pre id="json-output"></pre>
 
 <div id="store-section">
-  <h2>JSON Store</h2>
+  <h2>JSON Store <button id="toggle-store-btn">Hide Store</button></h2>
 
   <div id="store-upload">
     <input type="file" id="store-file-input" accept=".json">
+    <input type="text" id="store-tags-input" placeholder="Add tags separated by commas">
     <button id="store-upload-btn">Upload JSON</button>
   </div>
 
-  <div id="store-list"></div>
+  <input type="text" id="store-search" placeholder="Search by title or tags">
+
+  <div id="store-list" style="display: flex; flex-wrap: wrap; gap: 16px;"></div>
 </div>
+
+<script>
+const storeSection = document.getElementById('store-section');
+const toggleStoreBtn = document.getElementById('toggle-store-btn');
+const storeFileInput = document.getElementById('store-file-input');
+const storeUploadBtn = document.getElementById('store-upload-btn');
+const storeTagsInput = document.getElementById('store-tags-input');
+const storeSearch = document.getElementById('store-search');
+const storeList = document.getElementById('store-list');
+
+let storeJSONs = JSON.parse(localStorage.getItem('storeJSONs')) || [];
+const bannedWords = ['badword1','badword2','slur1','slur2']; // add banned words
+
+function saveStore() {
+  localStorage.setItem('storeJSONs', JSON.stringify(storeJSONs));
+}
+
+function createStoreBlock(item) {
+  const container = document.createElement('div');
+  container.className = 'item-block';
+  container.style.width = '23%'; // 4 per row
+
+  const title = document.createElement('div');
+  title.textContent = item.name || 'Untitled JSON';
+  title.style.fontWeight = 'bold';
+  container.appendChild(title);
+
+  const tags = document.createElement('div');
+  tags.textContent = 'Tags: ' + (item.tags || []).join(', ');
+  tags.style.fontSize = '12px';
+  tags.style.color = '#66ff66';
+  container.appendChild(tags);
+
+  const previewBtn = document.createElement('button');
+  previewBtn.textContent = 'Show JSON';
+  container.appendChild(previewBtn);
+
+  const pre = document.createElement('pre');
+  pre.textContent = JSON.stringify(item.data, null, 2);
+  pre.style.display = 'none';
+  pre.style.maxHeight = '150px';
+  pre.style.overflowY = 'auto';
+  container.appendChild(pre);
+
+  previewBtn.onclick = () => {
+    if (pre.style.display === 'none') {
+      pre.style.display = 'block';
+      previewBtn.textContent = 'Hide JSON';
+    } else {
+      pre.style.display = 'none';
+      previewBtn.textContent = 'Show JSON';
+    }
+  };
+
+  const downloadBtn = document.createElement('button');
+  downloadBtn.textContent = 'Download';
+  downloadBtn.onclick = () => {
+    const blob = new Blob([JSON.stringify(item.data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = item.name || 'stash.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  container.appendChild(downloadBtn);
+
+  return container;
+}
+
+function renderStore() {
+  const query = storeSearch.value.toLowerCase();
+  storeList.innerHTML = '';
+  storeJSONs.forEach(item => {
+    const matchTitle = item.name && item.name.toLowerCase().includes(query);
+    const matchTags = item.tags && item.tags.some(tag => tag.toLowerCase().includes(query));
+    if (!query || matchTitle || matchTags) {
+      storeList.appendChild(createStoreBlock(item));
+    }
+  });
+}
+
+toggleStoreBtn.onclick = () => {
+  if (storeList.style.display === 'none') {
+    storeList.style.display = 'flex';
+    toggleStoreBtn.textContent = 'Hide Store';
+  } else {
+    storeList.style.display = 'none';
+    toggleStoreBtn.textContent = 'Show Store';
+  }
+};
+
+storeUploadBtn.onclick = () => {
+  const file = storeFileInput.files[0];
+  if (!file) return alert('Select a JSON file first.');
+  const tags = storeTagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+  for (let tag of tags) {
+    for (let banned of bannedWords) {
+      if (tag.toLowerCase().includes(banned)) return alert('Invalid tag: ' + tag);
+    }
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      storeJSONs.push({ name: file.name, data, tags });
+      saveStore();
+      renderStore();
+      storeFileInput.value = '';
+      storeTagsInput.value = '';
+    } catch (err) {
+      alert('Invalid JSON file!');
+    }
+  };
+  reader.readAsText(file);
+};
+
+storeSearch.addEventListener('input', renderStore);
+
+renderStore();
+</script>
 
 </div>
 
@@ -695,64 +818,80 @@ const itemOptions = [
 const storeFileInput = document.getElementById('store-file-input');
 const storeUploadBtn = document.getElementById('store-upload-btn');
 const storeList = document.getElementById('store-list');
+const toggleStoreBtn = document.getElementById('toggle-store-btn');
 
 // Load existing JSONs from localStorage
 let storeJSONs = JSON.parse(localStorage.getItem('jsonStore')) || [];
 
+// Save store to localStorage
 function saveStore() {
   localStorage.setItem('jsonStore', JSON.stringify(storeJSONs));
 }
 
-function renderStore() {
+// Create store block (matches editor style)
+function createStoreBlock(item) {
+  const block = document.createElement('div');
+  block.className = 'item-block';
+  block.style.width = '23%';
+  block.style.display = 'inline-block';
+  block.style.margin = '1%';
+  block.style.verticalAlign = 'top';
+
+  const title = document.createElement('h4');
+  title.textContent = item.name;
+  title.style.fontSize = '16px';
+  title.style.marginBottom = '8px';
+  block.appendChild(title);
+
+  const pre = document.createElement('pre');
+  pre.textContent = JSON.stringify(item.data, null, 2);
+  pre.style.display = 'none';
+  pre.style.fontSize = '12px';
+  pre.style.maxHeight = '150px';
+  pre.style.overflowY = 'auto';
+  pre.style.background = '#001a00';
+  pre.style.color = '#39ff14';
+  pre.style.padding = '6px';
+  pre.style.border = '1px solid #39ff14';
+  block.appendChild(pre);
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.textContent = 'Show JSON';
+  toggleBtn.onclick = () => {
+    if (pre.style.display === 'none') {
+      pre.style.display = 'block';
+      toggleBtn.textContent = 'Hide JSON';
+    } else {
+      pre.style.display = 'none';
+      toggleBtn.textContent = 'Show JSON';
+    }
+  };
+  block.appendChild(toggleBtn);
+
+  const downloadBtn = document.createElement('button');
+  downloadBtn.textContent = 'Download';
+  downloadBtn.onclick = () => {
+    const blob = new Blob([JSON.stringify(item.data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = item.name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  block.appendChild(downloadBtn);
+
+  return block;
+}
+
+// Render the store
+function renderStore(filter = '') {
   storeList.innerHTML = '';
-  storeJSONs.forEach((item, idx) => {
-    const block = document.createElement('div');
-    block.className = 'store-block';
+  const filtered = storeJSONs.filter(item =>
+    item.name.toLowerCase().includes(filter.toLowerCase())
+  );
 
-    const title = document.createElement('h4');
-    title.textContent = item.name;
-    block.appendChild(title);
-
-    const pre = document.createElement('pre');
-    pre.textContent = JSON.stringify(item.data, null, 2);
-    block.appendChild(pre);
-
-    const toggleBtn = document.createElement('button');
-    toggleBtn.textContent = 'Show Preview';
-    toggleBtn.onclick = () => {
-      if (pre.style.display === 'none') {
-        pre.style.display = 'block';
-        toggleBtn.textContent = 'Hide Preview';
-      } else {
-        pre.style.display = 'none';
-        toggleBtn.textContent = 'Show Preview';
-      }
-    };
-    block.appendChild(toggleBtn);
-
-    const downloadBtn = document.createElement('button');
-    downloadBtn.textContent = 'Download';
-    downloadBtn.onclick = () => {
-      const blob = new Blob([JSON.stringify(item.data, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = item.name;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    };
-    block.appendChild(downloadBtn);
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.textContent = 'Delete';
-    deleteBtn.onclick = () => {
-      if (confirm(`Delete "${item.name}" from store?`)) {
-        storeJSONs.splice(idx, 1);
-        saveStore();
-        renderStore();
-      }
-    };
-    block.appendChild(deleteBtn);
-
+  filtered.forEach(item => {
+    const block = createStoreBlock(item);
     storeList.appendChild(block);
   });
 }
@@ -777,8 +916,17 @@ storeUploadBtn.addEventListener('click', () => {
   reader.readAsText(file);
 });
 
+// Optional: Toggle hide/show store
+if (toggleStoreBtn) {
+  toggleStoreBtn.addEventListener('click', () => {
+    storeList.parentElement.style.display =
+      storeList.parentElement.style.display === 'none' ? 'block' : 'none';
+  });
+}
+
 // Initial render
 renderStore();
+
 
 
   
